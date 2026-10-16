@@ -5,7 +5,7 @@ Overview
 A Python-based scheduler that reads scan names, start times, and end times from a CSV file and prints messages at the scheduled times. 
 Project Structure
 
-scan-scheduler/
+project/
 ├── scans.csv
 ├── scan_scheduler.py
 └── README.md
