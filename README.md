@@ -13,9 +13,8 @@ project/
 CSV Format
 
 scan_name,start_time,end_time
-Scan_A,10:00,17:00
-Scan_B,11:00,18:00
-
+Scan_A,20261016 220500,20261016 221000
+Scan_B,20261016 221100,20261016 222000
 Time format: HH:MM (24-hour format).
 
 Requirements
