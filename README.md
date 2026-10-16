@@ -27,3 +27,7 @@ How to Run
 Windows
 
 python scan_scheduler.py
+
+Mac/Linux
+
+python3 scheduler.py
