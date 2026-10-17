@@ -9,6 +9,22 @@ This project reads scan schedule information from a CSV file and prints start an
 | ScanA | 20261017 150000 | 20261017 151000 |
 | ScanB | 20261017 153000 | 20261017 154000 |
 
+## Project Structure
+
+Project/
+│
+├── scheduler.py
+├── sample_scans.csv
+├── README.md
+├── requirements.txt
+└── .gitignore
+
+## Before running the program
+
+1. Copy sample_scans.csv to scans.csv
+2. Update the schedule values in scans.csv
+3. Run the program
+
 ## Windows Setup
 
 Create Virtual Environment
@@ -46,8 +62,3 @@ Run the Program
 python3 scheduler.py
 
 
-Before running the program:
-
-1. Copy sample_scans.csv to scans.csv
-2. Update the schedule values in scans.csv
-3. Run the program
