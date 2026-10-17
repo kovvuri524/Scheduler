@@ -44,3 +44,10 @@ pip install -r requirements.txt
 Run the Program
 
 python3 scheduler.py
+
+
+Before running the program:
+
+1. Copy sample_scans.csv to scans.csv
+2. Update the schedule values in scans.csv
+3. Run the program
