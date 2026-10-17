@@ -9,6 +9,17 @@ This project reads scan schedule information from a CSV file and prints start an
 | ScanA | 20261017 150000 | 20261017 151000 |
 | ScanB | 20261017 153000 | 20261017 154000 |
 
+## Project Structure
+
+```text
+Project/
+|
+|-- scheduler.py
+|-- sample_scans.csv
+|-- README.md
+|-- requirements.txt
+`-- .gitignore
+```
 
 ## Before running the program
 
