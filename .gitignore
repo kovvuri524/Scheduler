@@ -1,4 +1,13 @@
-venv/
+# Virtual Environment
+.venv/
+
+# Python cache
 __pycache__/
 *.pyc
+
+# Runtime generated folders
+start_time/
+end_time/
+
+# Runtime CSV
 scans.csv
