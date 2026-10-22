@@ -3,46 +3,55 @@ Scheduler Program
 
 Purpose:
 --------
-Reads scan schedules from scans.csv and creates JSON files
-when the configured start and end times are reached.
+Reads scan schedules from scans.csv and
+triggers start and end email notifications
+when configured times are reached.
 
 Features:
 ---------
 1. Reads scan schedules from CSV.
-2. Executes start events 1 minute after the configured times.Executes end events 2 minute after the configured times.
-3. Calls dedicated handlers for start and end events.
+2. Triggers scan start notifications.
+3. Triggers scan completion notifications.
 4. Supports retry mechanism for technical failures.
-5. Creates JSON files in start_time and end_time folders.
+5. Sends failure notifications after retry exhaustion.
 6. Prevents duplicate scan processing.
-7. Works on Windows, Linux, and macOS.
+7. Supports asynchronous execution.
+8. Compatible with Docker deployment.
 
-CSV Format:
------------
-Scan_name,Start_time,End_time
-ScanA,20261019150000,20261019150100
+Workflow:
+---------
+CSV File
+    ↓
+Load Scan Schedule
+    ↓
+Monitor Current Time
+    ↓
+Start Time Reached
+    ↓
+process_start()
+    ↓
+Start Email Sent
 
-Time Format:
-------------
-YYYYMMDDHHMMSS
+End Time Reached
+    ↓
+process_end()
+    ↓
+Completion Email Sent
 
-Example:
---------
-20261019153045
+Duplicate Scan
+    ↓
+DuplicateScanError
+    ↓
+Duplicate Email Sent
 
-Retry Logic:
-------------
-Technical Failures:
-    - Retries 3 times.
-    - Waits 15–25 seconds between retries.
-
-Duplicate Files:
-    - Marked as FAILED.
-    - No retries performed.
+Technical Error
+    ↓
+Retry 3 Times
+    ↓
+Failure Email Sent
 """
 
-
 import csv
-import os
 import asyncio
 import random
 
@@ -50,23 +59,22 @@ from datetime import datetime, timedelta
 
 from handlers.start_handler import process_start
 from handlers.end_handler import process_end
+from handlers.email_handler import send_email
+
 from exceptions import DuplicateScanError
 
+
+# Stores all scan jobs loaded from CSV
 jobs = []
 
-os.makedirs(
-    "start_time",
-    exist_ok=True
-)
 
-os.makedirs(
-    "end_time",
-    exist_ok=True
-)
-
+# Load scan configuration
 try:
 
-    with open("scans.csv", "r") as file:
+    with open(
+        "scans.csv",
+        "r"
+    ) as file:
 
         reader = csv.DictReader(file)
 
@@ -90,12 +98,17 @@ try:
                     ) + timedelta(minutes=2),
 
                 "start_done": False,
+
                 "end_done": False
+
             })
 
-except Exception:
+except Exception as error:
 
-    print("FAILED")
+    print(
+        f"Failed to load CSV: {error}"
+    )
+
     exit()
 
 
@@ -103,22 +116,81 @@ async def execute_with_retry(
     function,
     scan_name
 ):
+    """
+    Execute a function with retry support.
+
+    Parameters:
+    ----------
+    function
+        Function to execute
+        (process_start or process_end)
+
+    scan_name
+        Name of the scan.
+
+    Behavior:
+    ---------
+    1. Executes target function.
+    2. Retries 3 times for technical errors.
+    3. Sends duplicate notification email
+       for DuplicateScanError.
+    4. Sends failure email when all retries
+       are exhausted.
+    """
 
     for attempt in range(1, 4):
 
         try:
 
-            await function(scan_name)
+            await function(
+                scan_name
+            )
 
             return True
 
         except DuplicateScanError:
 
-            print("FAILED")
+            print(
+                f"{scan_name} already processed"
+            )
+
+            try:
+
+                await send_email(
+                    subject=(
+                        f"Duplicate Scan - "
+                        f"{scan_name}"
+                    ),
+                    body=f"""
+Hello,
+
+The scan "{scan_name}" has already been processed.
+
+No further action was taken.
+
+Regards,
+Scheduler Application
+"""
+                )
+
+                print(
+                    "Duplicate email sent."
+                )
+
+            except Exception as email_error:
+
+                print(
+                    f"Duplicate email error: "
+                    f"{email_error}"
+                )
 
             return True
 
-        except Exception as e:
+        except Exception as error:
+
+            print(
+                f"Technical error: {error}"
+            )
 
             if attempt < 3:
 
@@ -128,11 +200,8 @@ async def execute_with_retry(
                 )
 
                 print(
-                    f"Technical error: {e}"
-                )
-
-                print(
-                    f"Retry {attempt}/3 in {wait_time} seconds"
+                    f"Retry {attempt}/3 "
+                    f"in {wait_time} seconds"
                 )
 
                 await asyncio.sleep(
@@ -142,10 +211,45 @@ async def execute_with_retry(
             else:
 
                 print(
-                    f"Technical error: {e}"
+                    "All retry attempts exhausted."
                 )
 
-                print("FAILED")
+                try:
+
+                    await send_email(
+                        subject=(
+                            f"Scan Failed - "
+                            f"{scan_name}"
+                        ),
+                        body=f"""
+Hello,
+
+The scan "{scan_name}" could not be processed.
+
+Reason:
+{error}
+
+Retry Attempts:
+3
+
+Failure Time:
+{datetime.now().strftime('%Y%m%d%H%M%S')}
+
+Regards,
+Scheduler Application
+"""
+                    )
+
+                    print(
+                        "Failure email sent."
+                    )
+
+                except Exception as email_error:
+
+                    print(
+                        f"Failure email error: "
+                        f"{email_error}"
+                    )
 
                 return False
 
@@ -153,6 +257,18 @@ async def execute_with_retry(
 
 
 async def monitor():
+    """
+    Continuously monitors all configured jobs.
+
+    Behavior:
+    ---------
+    1. Checks current time every second.
+    2. Triggers start event when
+       start_time is reached.
+    3. Triggers end event when
+       end_time is reached.
+    4. Stops when all jobs are completed.
+    """
 
     while True:
 
@@ -194,6 +310,7 @@ async def monitor():
         await asyncio.sleep(1)
 
 
+# Application Entry Point
 asyncio.run(
     monitor()
 )
