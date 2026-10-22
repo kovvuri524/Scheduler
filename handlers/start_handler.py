@@ -3,52 +3,47 @@ Start Handler
 
 Purpose:
 --------
-Creates a start JSON file when a scheduled
-scan start event is triggered.
+Sends a notification email when a scheduled
+scan reaches its configured start time.
 
 Responsibilities:
 -----------------
-1. Validate whether a start JSON already exists.
-2. Prevent duplicate start processing.
-3. Generate timestamp.
-4. Create JSON file in start_time folder.
+1. Validate duplicate scan names.
+2. Generate start event timestamp.
+3. Send scan start notification.
+4. Store processed scan names to prevent
+   duplicate processing.
 
-Output Example:
----------------
-File Name:
-ScanA_start_duration20261019150100.json
-
-JSON:
-{
-    "scan_name": "ScanA",
-    "time": "20261019150100"
-}
-
-Exceptions:
------------
-DuplicateScanError
-    Raised when a start JSON file for
-    the scan already exists.
+Used By:
+--------
+- scheduler.py
 """
 
-import json
-import os
-
 from datetime import datetime
+
+from handlers.email_handler import send_email
 from exceptions import DuplicateScanError
 
 
 async def process_start(scan_name):
 
-    existing_files = [
-        file
-        for file in os.listdir("start_time")
-        if file.startswith(
-            f"{scan_name}_start_duration"
-        )
-    ]
+    try:
 
-    if existing_files:
+        with open(
+            "processed_scans.txt",
+            "r"
+        ) as file:
+
+            processed_names = (
+                file.read().splitlines()
+            )
+
+    except FileNotFoundError:
+
+        processed_names = []
+
+    if scan_name in processed_names:
+
         raise DuplicateScanError(
             f"{scan_name} already processed"
         )
@@ -57,30 +52,26 @@ async def process_start(scan_name):
         "%Y%m%d%H%M%S"
     )
 
-    file_name = (
-        f"{scan_name}_start_duration"
-        f"{timestamp}.json"
+    await send_email(
+        subject=f"Scan Started - {scan_name}",
+        body=f"""
+Hello,
+
+The scan "{scan_name}" has started successfully.
+
+Start Time:
+{timestamp}
+
+Regards,
+Scheduler Application
+"""
     )
 
-    file_path = os.path.join(
-        "start_time",
-        file_name
-    )
+    with open(
+        "processed_scans.txt",
+        "a"
+    ) as file:
 
-    # file_path = os.path.join(
-    # "wrong_folder",
-    # file_name
-    # )
-
-    data = {
-        "scan_name": scan_name,
-        "start_time": timestamp
-    }
-
-    with open(file_path, "w") as json_file:
-        json.dump(
-            data,
-            json_file,
-            indent=4
+        file.write(
+            f"{scan_name}\n"
         )
-
