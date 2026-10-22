@@ -2,85 +2,151 @@
 
 ## Overview
 
-This project reads scan schedule information from a CSV file and creates JSON files when the configured start and end times are reached.
+This project reads scan schedule information from a CSV file and sends email notifications when configured start and end times are reached.
 
 The scheduler:
 
 - Reads scan schedules from `scans.csv`
-- Triggers start and end events 1 minute after the configured times
-- Creates JSON files for start and end events
-- Stores JSON files in dedicated folders
-- Supports retry logic for technical failures
+- Triggers start events 1 minute after the configured start time
+- Triggers end events 2 minutes after the configured end time
+- Sends email notifications for scan start and completion
+- Sends failure notifications after retry exhaustion
 - Prevents duplicate scan processing
+- Supports retry logic for technical failures
 - Supports Windows, Linux, and macOS
 
-## Features
+---
 
-### Start Event
+# Features
+
+## Start Event
 
 When the configured start time is reached:
 
-- Creates a JSON file in the `start_time` folder
-- Generates a timestamped filename
 - Validates whether the scan has already been processed
+- Sends a Start Notification email
+- Stores the scan name in `processed_scans.txt`
 
-Example:
+### Example
+
+**Subject**
 
 ```text
-start_time/
-└── ScanA_start_duration20261019150000.json
+Scan Started - ScanA
 ```
 
-### End Event
+**Body**
+
+```text
+Hello,
+
+The scan "ScanA" has started successfully.
+
+Start Time:
+20261022153000
+
+Regards,
+Scheduler Application
+```
+
+---
+
+## End Event
 
 When the configured end time is reached:
 
-- Creates a JSON file in the `end_time` folder
-- Generates a timestamped filename
-- Validates whether the scan has already been processed
+- Sends a Completion Notification email
 
-Example:
+### Example
 
-```text
-end_time/
-└── ScanA_end_duration20261019151000.json
-```
-
-## Duplicate File Validation
-
-Before creating a JSON file, the handler checks whether a file already exists for the same scan.
-
-Example:
+**Subject**
 
 ```text
-ScanA_start_duration20261019150000.json
+Scan Completed - ScanA
 ```
 
-If a matching file already exists:
+**Body**
 
 ```text
-FAILED
+Hello,
+
+The scan "ScanA" has completed successfully.
+
+End Time:
+20261022154000
+
+Regards,
+Scheduler Application
 ```
 
-is displayed and no new file is created.
+---
+
+## Duplicate Scan Validation
+
+Before processing a scan, the application checks whether the scan name already exists in:
+
+```text
+processed_scans.txt
+```
+
+### Example
+
+```text
+ScanA
+ScanB
+ScanC
+```
+
+If the scan already exists:
+
+```text
+ScanA already processed
+```
+
+A duplicate notification email is sent.
+
+### Example
+
+**Subject**
+
+```text
+Duplicate Scan - ScanA
+```
+
+**Body**
+
+```text
+Hello,
+
+The scan "ScanA" has already been processed.
+
+No further action was taken.
+
+Regards,
+Scheduler Application
+```
+
+---
 
 ## Retry Logic
 
 Technical failures are automatically retried.
 
-Examples:
+### Examples
 
-- Permission issues
 - File system errors
-- Missing folders
-- Temporary operating system failures
+- Permission issues
+- SMTP connection failures
+- Unexpected runtime errors
 
-Retry behavior:
+### Retry Behavior
 
-- Maximum Retries: 3
-- Retry Wait Time: Random value between 15 and 25 seconds
+```text
+Maximum Retries : 3
+Retry Wait Time : 15–25 Seconds
+```
 
-Example:
+### Example
 
 ```text
 Retry 1
@@ -93,158 +159,258 @@ Wait 18 seconds
 
 Retry 3
 ↓
-Failed
+FAILED
 ```
 
-Duplicate records are not retried.
+Duplicate scans are not retried.
 
-## Sample CSV Format
+---
 
-| Scan_name | Start_time | End_time |
-|------------|------------|------------|
-| ScanA | 20261019150000 | 20261019151000 |
-| ScanB | 20261019153000 | 20261019154000 |
+## Failure Notifications
 
-### Time Format
+If all retry attempts fail, the scheduler sends a failure email.
+
+### Example
+
+**Subject**
+
+```text
+Scan Failed - ScanA
+```
+
+**Body**
+
+```text
+Hello,
+
+The scan "ScanA" could not be processed.
+
+Reason:
+FileNotFoundError
+
+Retry Attempts:
+3
+
+Failure Time:
+20261022154500
+
+Regards,
+Scheduler Application
+```
+
+---
+
+# Sample CSV Format
+
+```csv
+Scan_name,Start_time,End_time
+ScanA,20261022150000,20261022151000
+ScanB,20261022153000,20261022154000
+```
+
+---
+
+## Time Format
 
 ```text
 YYYYMMDDHHMMSS
 ```
 
-Example:
+### Example
 
 ```text
-20261019153045
+20261022153045
 ```
 
-## Generated JSON Format
+---
 
-### Start Event
+# Email Notifications
 
-**File**
+## Start Notification
 
 ```text
-ScanA_start_duration20261019150000.json
+Scan Started - ScanA
 ```
 
-**Content**
-
-```json
-{
-    "scan_name": "ScanA",
-    "time": "20261019150000"
-}
-```
-
-### End Event
-
-**File**
+## Completion Notification
 
 ```text
-ScanA_end_duration20261019151000.json
+Scan Completed - ScanA
 ```
 
-**Content**
-
-```json
-{
-    "scan_name": "ScanA",
-    "time": "20261019151000"
-}
-```
-
-## Project Structure
+## Duplicate Notification
 
 ```text
-Project/
+Duplicate Scan - ScanA
+```
+
+## Failure Notification
+
+```text
+Scan Failed - ScanA
+```
+
+---
+
+# Project Structure
+
+```text
+project/
 │
 ├── scheduler.py
-├── scans.csv
 ├── exceptions.py
-├── README.md
+├── scans.csv
+├── processed_scans.txt
 ├── requirements.txt
+├── Dockerfile
+├── .env
+├── README.md
 │
 ├── handlers/
+│   ├── __init__.py
+│   ├── email_handler.py
 │   ├── start_handler.py
 │   └── end_handler.py
 │
-├── start_time/
-│
-└── end_time/
+└── .gitignore
 ```
 
-## Components
+---
 
-### scheduler.py
+# Components
+
+## scheduler.py
 
 Main scheduler process.
 
-Responsibilities:
+### Responsibilities
 
-- Read CSV schedule data
-- Monitor start and end times
+- Read scan schedules from CSV
+- Monitor configured start and end times
 - Execute retry logic
+- Handle duplicate scans
 - Trigger start and end handlers
+- Send duplicate and failure notifications
 - Track job completion
 
-### handlers/start_handler.py
+---
+
+## handlers/start_handler.py
 
 Responsible for:
 
 - Start event processing
-- Duplicate validation
-- Start JSON creation
+- Duplicate scan validation
+- Start notification emails
+- Updating `processed_scans.txt`
 
-### handlers/end_handler.py
+---
+
+## handlers/end_handler.py
 
 Responsible for:
 
 - End event processing
-- Duplicate validation
-- End JSON creation
+- Completion notification emails
 
-### exceptions.py
+---
+
+## handlers/email_handler.py
+
+Responsible for:
+
+- SMTP connection management
+- Gmail authentication
+- Email creation
+- Email delivery
+- Notification handling
+
+---
+
+## exceptions.py
+
 Contains custom application exceptions.
-Current exception:
+
+### Current Exception
+
+```python
 DuplicateScanError
-Used when a scan has already been processed.
+```
+
+Raised when a scan has already been processed.
+
+---
+
+# Environment Variables
+
+Create a `.env` file:
+
+```env
+EMAIL_ID=your_email@gmail.com
+EMAIL_PASSWORD=your_app_password
+RECIPIENT_EMAIL=recipient@gmail.com
+```
+
+---
 
 # Windows Setup
+
 ## Create Virtual Environment
 
+```powershell
 python -m venv .venv
+```
 
 ## Activate Virtual Environment
 
+```powershell
 .\.venv\Scripts\Activate.ps1
+```
 
 ## Install Dependencies
 
+```powershell
 pip install -r requirements.txt
+```
 
 ## Run Scheduler
 
+```powershell
 python scheduler.py
+```
+
+---
 
 # Linux / macOS Setup
 
 ## Create Virtual Environment
 
+```bash
 python3 -m venv .venv
+```
 
 ## Activate Virtual Environment
 
+```bash
 source .venv/bin/activate
+```
 
 ## Install Dependencies
 
+```bash
 pip install -r requirements.txt
+```
 
 ## Run Scheduler
 
+```bash
 python3 scheduler.py
+```
 
 # Supported Platforms
-Windows
-Linux
-macOS
+
+- Windows
+- Linux
+- macOS
+
+
