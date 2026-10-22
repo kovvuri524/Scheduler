@@ -5,9 +5,8 @@
 __pycache__/
 *.pyc
 
-# Runtime generated folders
-start_time/
-end_time/
-
 # Runtime CSV
 scans.csv
+
+.env
+processed_scans.txt
